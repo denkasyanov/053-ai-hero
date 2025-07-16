@@ -1,0 +1,1 @@
+export { searchWebTool } from "./search-web";
