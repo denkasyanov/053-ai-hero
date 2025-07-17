@@ -2,7 +2,11 @@ import { and, count, eq, gte } from "drizzle-orm";
 import { db } from "../db";
 import { userRequests, users } from "../db/schema";
 
-export async function getUserRequestsToday(userId: string): Promise<number> {
+export async function getUserRequestsToday(opts: {
+  userId: string;
+}): Promise<number> {
+  const { userId } = opts;
+  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -16,13 +20,21 @@ export async function getUserRequestsToday(userId: string): Promise<number> {
   return result[0]?.count ?? 0;
 }
 
-export async function createUserRequest(userId: string): Promise<void> {
+export async function createUserRequest(opts: {
+  userId: string;
+}): Promise<void> {
+  const { userId } = opts;
+  
   await db.insert(userRequests).values({
     userId,
   });
 }
 
-export async function isUserAdmin(userId: string): Promise<boolean> {
+export async function isUserAdmin(opts: {
+  userId: string;
+}): Promise<boolean> {
+  const { userId } = opts;
+  
   const result = await db
     .select({ isAdmin: users.isAdmin })
     .from(users)

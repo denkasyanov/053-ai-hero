@@ -60,7 +60,12 @@ export const upsertChat = async (opts: {
   });
 };
 
-export const getChat = async (chatId: string, userId: string) => {
+export const getChat = async (opts: {
+  chatId: string;
+  userId: string;
+}) => {
+  const { chatId, userId } = opts;
+  
   const chat = await db.query.chats.findFirst({
     where: and(eq(chats.id, chatId), eq(chats.userId, userId)),
     with: {
@@ -73,7 +78,11 @@ export const getChat = async (chatId: string, userId: string) => {
   return chat;
 };
 
-export const getChats = async (userId: string) => {
+export const getChats = async (opts: {
+  userId: string;
+}) => {
+  const { userId } = opts;
+  
   const userChats = await db.query.chats.findMany({
     where: eq(chats.userId, userId),
     orderBy: [desc(chats.updatedAt)],
