@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { ChatMessage } from "~/components/chat-message";
 import { SignInModal } from "~/components/sign-in-modal";
@@ -11,14 +11,29 @@ interface ChatProps {
   isAuthenticated: boolean;
 }
 
+function getErrorMessage(error: Error): string {
+  // Check if error.message is a JSON string (for rate limit errors)
+  try {
+    const parsed = JSON.parse(error.message) as { message?: string };
+    if (parsed.message) {
+      return parsed.message;
+    }
+  } catch {
+    // Not JSON, just return the message as-is
+  }
+  
+  return error.message || 'An error occurred';
+}
+
 export const ChatPage = ({ userName, isAuthenticated }: ChatProps) => {
   const [showSignInModal, setShowSignInModal] = useState(false);
-  const { messages, input, handleInputChange, handleSubmit, isLoading } =
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } =
     useChat({
       api: "/api/chat",
     });
 
-  console.log(messages);
+  // console.log(messages);
+  console.log(error);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -50,6 +65,14 @@ export const ChatPage = ({ userName, isAuthenticated }: ChatProps) => {
         </div>
 
         <div className="border-t border-gray-700">
+          {error && (
+            <div className="mx-auto max-w-[65ch] px-4 pt-4">
+              <div className="flex items-center gap-2 rounded-lg border border-red-800 bg-red-900/20 p-3 text-red-300">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <p className="text-sm">{getErrorMessage(error)}</p>
+              </div>
+            </div>
+          )}
           <form onSubmit={onSubmit} className="mx-auto max-w-[65ch] p-4">
             <div className="flex gap-2">
               <input
