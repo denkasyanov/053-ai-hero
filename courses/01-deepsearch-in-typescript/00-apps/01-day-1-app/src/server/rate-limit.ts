@@ -1,34 +1,45 @@
-import { and, count, eq, gte } from "drizzle-orm";
-import { db } from "./db";
-import { userRequests, users } from "./db/schema";
+import { env } from "~/env";
 
-export const DAILY_REQUEST_LIMIT = 3;
+export const DAILY_REQUEST_LIMIT_ANONYMOUS = env.DAILY_REQUEST_LIMIT_ANONYMOUS;
+export const DAILY_REQUEST_LIMIT_AUTHENTICATED = env.DAILY_REQUEST_LIMIT_AUTHENTICATED;
 
-export async function getUserRequestsToday(userId: string): Promise<number> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const result = await db
-    .select({ count: count() })
-    .from(userRequests)
-    .where(
-      and(eq(userRequests.userId, userId), gte(userRequests.createdAt, today)),
-    );
-
-  return result[0]?.count ?? 0;
+export interface RateLimitCheckResult {
+  allowed: boolean;
+  limit?: number;
+  remaining?: number;
+  resetAt?: Date;
 }
 
-export async function createUserRequest(userId: string): Promise<void> {
-  await db.insert(userRequests).values({
-    userId,
-  });
-}
+export function checkRateLimit(
+  requestCount: number,
+  isAdmin: boolean,
+  isAuthenticated: boolean = true
+): RateLimitCheckResult {
+  // Admins have unlimited access
+  if (isAdmin) {
+    return { allowed: true };
+  }
 
-export async function isUserAdmin(userId: string): Promise<boolean> {
-  const result = await db
-    .select({ isAdmin: users.isAdmin })
-    .from(users)
-    .where(eq(users.id, userId));
+  const limit = isAuthenticated 
+    ? DAILY_REQUEST_LIMIT_AUTHENTICATED 
+    : DAILY_REQUEST_LIMIT_ANONYMOUS;
 
-  return result[0]?.isAdmin ?? false;
+  if (requestCount >= limit) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    return {
+      allowed: false,
+      limit,
+      remaining: 0,
+      resetAt: tomorrow,
+    };
+  }
+
+  return {
+    allowed: true,
+    limit,
+    remaining: limit - requestCount,
+  };
 }
