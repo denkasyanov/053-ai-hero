@@ -13,15 +13,18 @@ export const upsertChat = async (opts: {
 
   // Use a transaction to ensure data consistency
   await db.transaction(async (tx) => {
-    // Check if the chat exists and belongs to the user
+    // First check if the chat exists at all (regardless of owner)
     const existingChat = await tx.query.chats.findFirst({
-      where: and(eq(chats.id, chatId), eq(chats.userId, userId)),
+      where: eq(chats.id, chatId),
     });
 
     if (existingChat) {
       // If chat exists, verify it belongs to the user
       if (existingChat.userId !== userId) {
-        throw new Error("Unauthorized: Chat does not belong to user");
+        // TODO: Handle this error properly to avoid 500 responses
+        // Consider using a custom UnauthorizedError class that can be caught
+        // in the API route handler and return a proper 404/403 status
+        throw new Error("Chat not found");
       }
 
       // Delete all existing messages

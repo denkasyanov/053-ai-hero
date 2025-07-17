@@ -1,7 +1,12 @@
 import type { Message } from "ai";
-import { createDataStreamResponse, streamText } from "ai";
+import {
+  appendResponseMessages,
+  createDataStreamResponse,
+  streamText,
+} from "ai";
 import { model } from "~/llm/model";
 import { auth } from "~/server/auth";
+import { upsertChat } from "~/server/queries/chat";
 import {
   createUserRequest,
   getUserRequestsToday,
@@ -22,8 +27,8 @@ export async function POST(request: Request) {
   // Check rate limit
   const userId = session.user.id;
   const [requestCount, isAdmin] = await Promise.all([
-    getUserRequestsToday(userId),
-    isUserAdmin(userId),
+    getUserRequestsToday({ userId }),
+    isUserAdmin({ userId }),
   ]);
 
   const rateLimitCheck = checkRateLimit(requestCount, isAdmin);
@@ -48,15 +53,45 @@ export async function POST(request: Request) {
   }
 
   // Record the request
-  await createUserRequest(userId);
+  await createUserRequest({ userId });
 
   const body = (await request.json()) as {
     messages: Array<Message>;
+    chatId?: string;
   };
+
+  const { messages, chatId } = body;
+
+  // Generate a new chat ID if not provided
+  const finalChatId = chatId ?? crypto.randomUUID();
+
+  // Create a new chat if chatId was not provided
+  if (!chatId) {
+    // Extract the first user message content for the title
+    const firstUserMessage = messages.find((msg) => msg.role === "user");
+    const title =
+      firstUserMessage?.parts?.[0]?.type === "text"
+        ? firstUserMessage.parts[0].text.slice(0, 100)
+        : "New Chat";
+
+    // Create the chat with the initial user message
+    await upsertChat({
+      userId,
+      chatId: finalChatId,
+      title,
+      messages,
+    });
+  }
 
   return createDataStreamResponse({
     execute: async (dataStream) => {
-      const { messages } = body;
+      // Send new chat ID to frontend if this is a new chat
+      if (!chatId) {
+        dataStream.writeData({
+          type: "NEW_CHAT_CREATED",
+          chatId: finalChatId,
+        });
+      }
 
       console.log("Messages being sent to model:", messages);
 
@@ -73,6 +108,31 @@ When answering questions:
         maxSteps: 10,
         tools: {
           searchWeb: searchWebTool,
+        },
+        onFinish: async ({ text, finishReason, usage, response }) => {
+          const responseMessages = response.messages;
+
+          const updatedMessages = appendResponseMessages({
+            messages,
+            responseMessages,
+          });
+
+          // Extract the first user message content for the title (if this is a new chat)
+          const firstUserMessage = updatedMessages.find(
+            (msg) => msg.role === "user",
+          );
+          const title =
+            firstUserMessage?.parts?.[0]?.type === "text"
+              ? firstUserMessage.parts[0].text.slice(0, 100)
+              : "New Chat";
+
+          // Save the complete conversation to the database
+          await upsertChat({
+            userId,
+            chatId: finalChatId,
+            title,
+            messages: updatedMessages,
+          });
         },
       });
 

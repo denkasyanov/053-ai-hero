@@ -2,13 +2,16 @@
 
 import { useChat } from "@ai-sdk/react";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ChatMessage } from "~/components/chat-message";
 import { SignInModal } from "~/components/sign-in-modal";
+import { isNewChatCreated } from "~/utils/chat";
 
 interface ChatProps {
   userName: string;
   isAuthenticated: boolean;
+  chatId?: string;
 }
 
 function getErrorMessage(error: Error): string {
@@ -25,15 +28,27 @@ function getErrorMessage(error: Error): string {
   return error.message || 'An error occurred';
 }
 
-export const ChatPage = ({ userName, isAuthenticated }: ChatProps) => {
+export const ChatPage = ({ userName, isAuthenticated, chatId }: ChatProps) => {
+  const router = useRouter();
   const [showSignInModal, setShowSignInModal] = useState(false);
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } =
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error, data } =
     useChat({
       api: "/api/chat",
+      body: {
+        chatId,
+      },
     });
 
   // console.log(messages);
   console.log(error);
+
+  useEffect(() => {
+    const lastDataItem = data?.[data.length - 1];
+
+    if (lastDataItem && isNewChatCreated(lastDataItem)) {
+      router.push(`?id=${lastDataItem.chatId}`);
+    }
+  }, [data, router]);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
