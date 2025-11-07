@@ -20,7 +20,7 @@
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "@types/turndown": "^5.0.5",
-    "ai": "^4.2.0",
+    "ai": "^5.0.52",
     "autoevals": "^0.0.111",
     "cheerio": "^1.0.0",
     "dedent": "^1.5.3",
